@@ -20,6 +20,14 @@ function resolveProject(cwd) {
 	} catch {}
 	return basename(dir);
 }
+function hookCwd(data) {
+	if (!data || typeof data !== "object") return void 0;
+	if (typeof data.cwd === "string" && data.cwd.trim()) return data.cwd;
+	const roots = data.workspace_roots;
+	if (Array.isArray(roots)) {
+		for (const root of roots) if (typeof root === "string" && root.trim()) return root;
+	}
+}
 //#endregion
 //#region src/hooks/session-start.ts
 function isSdkChildContext(payload) {
@@ -48,9 +56,9 @@ async function main() {
 	}
 	if (!data || typeof data !== "object") return;
 	if (isSdkChildContext(data)) return;
-	const sessionId = data.session_id || data.sessionId || `ses_${Date.now().toString(36)}`;
-	const cwd = data.cwd || process.cwd();
-	const project = resolveProject(data.cwd);
+	const sessionId = data.session_id || data.sessionId || data.conversation_id || `ses_${Date.now().toString(36)}`;
+	const cwd = hookCwd(data) || process.cwd();
+	const project = resolveProject(cwd);
 	const url = `${REST_URL}/agentmemory/session/start`;
 	const init = {
 		method: "POST",
@@ -75,7 +83,8 @@ async function main() {
 		});
 		if (res.ok) {
 			const result = await res.json();
-			if (result.context) process.stdout.write(result.context);
+			if (result.context) if (typeof data.cursor_version === "string" || data.hook_event_name === "sessionStart") process.stdout.write(JSON.stringify({ additional_context: result.context }));
+			else process.stdout.write(result.context);
 		}
 	} catch {}
 }
