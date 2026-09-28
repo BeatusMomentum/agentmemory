@@ -1,7 +1,8 @@
 import { TriggerAction, type IIIClient } from "iii-sdk";
 import type { HttpRequest } from "@iii-dev/helpers/http";
 import { randomBytes } from "node:crypto";
-import type { Session, CompressedObservation, HookPayload, CommitLink, SessionSummary, HealthSnapshot } from "../types.js";
+import type { Session, CompressedObservation, HookPayload, CommitLink, SessionSummary, HealthSnapshot, AuditQueryResult, AuditMigrationState } from "../types.js";
+import { AUDIT_MIGRATION_STATE_KEY } from "../functions/audit.js";
 import { withKeyedLock } from "../state/keyed-mutex.js";
 import { KV } from "../state/schema.js";
 import { checkPayloadFrameSize } from "../state/frame-guard.js";
@@ -322,7 +323,7 @@ export function createStatusReporter(sdk: IIIClient, kv: StateKV, deps: StatusRe
     const cached = scan.last && options.scanMaxAgeMs !== undefined && Date.now() - scan.last.at < options.scanMaxAgeMs
       ? scan.last.value
       : null;
-    const [health, functionMetrics, graph, unindexed] = await Promise.all([
+    const [health, functionMetrics, graph, unindexed, auditMigrationState] = await Promise.all([
       options.health !== undefined ? Promise.resolve(options.health) : valueWithin(getLatestHealth(kv), STATUS_CHECK_TIMEOUT_MS),
       deps.metricsStore ? valueWithin(deps.metricsStore.getAll(), STATUS_CHECK_TIMEOUT_MS) : Promise.resolve([]),
       valueWithin(
@@ -330,6 +331,10 @@ export function createStatusReporter(sdk: IIIClient, kv: StateKV, deps: StatusRe
         STATUS_CHECK_TIMEOUT_MS,
       ),
       cached ? Promise.resolve(cached) : valueWithin(scan.run(), STATUS_CHECK_TIMEOUT_MS),
+      valueWithin(
+        kv.get<AuditMigrationState>(KV.auditMonths, AUDIT_MIGRATION_STATE_KEY),
+        STATUS_CHECK_TIMEOUT_MS,
+      ),
     ]);
     const observationsIndexed = [...idx.observationCountsBySession().values()].reduce((a, n) => a + n, 0);
     const documentKinds = idx.documentKindCounts();
@@ -376,6 +381,9 @@ export function createStatusReporter(sdk: IIIClient, kv: StateKV, deps: StatusRe
       },
       graph,
       graphExtractionEnabled: isGraphExtractionEnabled(),
+      auditLegacy: auditMigrationState
+        ? { status: auditMigrationState.status, sizeBytes: auditMigrationState.legacySizeBytes }
+        : null,
       indexPersistence: getIndexPersistenceStatus(),
     });
   };
@@ -2224,14 +2232,22 @@ export function registerApiTriggers(
           return { status_code: 400, body: { error: `invalid date: ${name}` } };
         }
       }
-      const entries = await sdk.trigger({ function_id: "mem::audit-query", payload: {
+      const result = await sdk.trigger<unknown, AuditQueryResult>({ function_id: "mem::audit-query", payload: {
         operation: asNonEmptyString(params["operation"]),
         dateFrom,
         dateTo,
         query: asNonEmptyString(params["q"]),
         limit: Math.min(Math.max(parsedLimit ?? 50, 1), 1000),
       } });
-      return { status_code: 200, body: { entries, success: true } };
+      return {
+        status_code: 200,
+        body: {
+          entries: result.entries,
+          legacyFrozen: result.legacyFrozen,
+          legacyFrozenBytes: result.legacyFrozenBytes,
+          success: true,
+        },
+      };
     },
   );
   sdk.registerTrigger({

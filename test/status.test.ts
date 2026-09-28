@@ -39,6 +39,7 @@ function inputs(overrides: Partial<StatusInputs> = {}): StatusInputs {
       updatedAt: "2026-09-24T11:59:00.000Z",
     },
     graphExtractionEnabled: true,
+    auditLegacy: null,
     ...overrides,
   };
 }
@@ -141,6 +142,21 @@ describe("evaluateStatus", () => {
     const report = evaluateStatus(inputs({ provider: "noop" }));
     expect(report.status).toBe("info");
     expect(report.problems[0].code).toBe("no-llm-provider");
+  });
+
+  it("reports a frozen legacy audit log only when the migration left it in place", () => {
+    expect(codes(evaluateStatus(inputs({ auditLegacy: { status: "too-large", sizeBytes: 1 } })))).toContain(
+      "audit-legacy-frozen",
+    );
+    expect(codes(evaluateStatus(inputs({ auditLegacy: { status: "unreadable" } })))).toContain(
+      "audit-legacy-frozen",
+    );
+    expect(codes(evaluateStatus(inputs({ auditLegacy: { status: "copied", sizeBytes: 1 } })))).not.toContain(
+      "audit-legacy-frozen",
+    );
+    expect(codes(evaluateStatus(inputs({ auditLegacy: { status: "done" } })))).not.toContain(
+      "audit-legacy-frozen",
+    );
   });
 });
 
@@ -397,10 +413,11 @@ describe("status wiring", () => {
 
   it("time-boxes every status probe so a slow store cannot hang the page", () => {
     const reporter = api.slice(api.indexOf("export function createStatusReporter"), api.indexOf("export function createConsolidationStatusReader"));
-    expect(reporter.match(/valueWithin\(/g)?.length).toBe(4);
+    expect(reporter.match(/valueWithin\(/g)?.length).toBe(5);
     expect(reporter).toMatch(/valueWithin\(scan\.run\(\), STATUS_CHECK_TIMEOUT_MS\)/);
     expect(api).toMatch(/run: singleFlight\(async \(\) => \{\s*const value = await findUnindexedObservations\(kv\);/);
     const handler = api.slice(api.indexOf('registerFunction("api::status"'), api.indexOf('function_id: "api::status"'));
+    expect(reporter).toMatch(/valueWithin\(\s*kv\.get<AuditMigrationState>\(KV\.auditMonths, AUDIT_MIGRATION_STATE_KEY\),\s*STATUS_CHECK_TIMEOUT_MS,\s*\)/);
     expect(handler).toContain("const report = await statusReport();");
   });
 

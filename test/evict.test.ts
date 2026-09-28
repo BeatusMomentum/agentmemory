@@ -6,6 +6,7 @@ import type {
 } from "../src/types.js";
 import { registerEvictFunction } from "../src/functions/evict.js";
 import { KV } from "../src/state/schema.js";
+import { currentAuditScope } from "./helpers/mocks.js";
 import {
   indexObservationSession,
   lookupObservationSession,
@@ -159,7 +160,7 @@ describe("mem::evict stale sessions", () => {
     expect(await kv.get(KV.sessions, sessionId)).toBeNull();
     const audits = await kv.list<{
       details: { reason: string };
-    }>(KV.audit);
+    }>(currentAuditScope());
     expect(audits[0].details.reason).toBe(
       "stale_session_recovered_then_evicted",
     );

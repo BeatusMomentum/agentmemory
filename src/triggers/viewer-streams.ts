@@ -4,7 +4,6 @@ import type { StateKV } from "../state/kv.js";
 import { KV } from "../state/schema.js";
 import type {
   Action,
-  AuditEntry,
   Crystal,
   GraphSnapshot,
   HealthSnapshot,
@@ -37,6 +36,7 @@ import { detectLlmProviderKind, loadConfig } from "../config.js";
 import { getBoundViewerPort, getViewerSkipped } from "../viewer/server.js";
 import { buildConfigFlags, checkAuth, createConsolidationStatusReader, createStatusReporter } from "./api.js";
 import { isStateDelete, sendViewerEvent } from "./events.js";
+import { setAuditRecordedListener } from "../functions/audit.js";
 
 type Response = {
   status_code: number;
@@ -190,7 +190,9 @@ export function registerViewerStreamTriggers(
   registerRowStream<Crystal>({ functionId: "event::viewer::crystal-changed", scope: KV.crystals, entity: "crystal", countKind: "crystals" });
   registerRowStream<SemanticMemory>({ functionId: "event::viewer::semantic-changed", scope: KV.semantic, entity: "semantic", countKind: "semantic" });
   registerRowStream<ProceduralMemory>({ functionId: "event::viewer::procedural-changed", scope: KV.procedural, entity: "procedural", countKind: "procedural" });
-  registerRowStream<AuditEntry>({ functionId: "event::viewer::audit-changed", scope: KV.audit, entity: "audit" });
+  setAuditRecordedListener((entry) => {
+    void sendViewerEvent(sdk, eventId("audit", entry.id), "audit.created", { id: entry.id, audit: entry }).catch(() => {});
+  });
 
   let lastGraphSnapshotEventAt = 0;
   sdk.registerFunction(

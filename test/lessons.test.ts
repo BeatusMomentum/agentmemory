@@ -5,6 +5,7 @@ vi.mock("../src/logger.js", () => ({
 }));
 
 import { normalizeLessonSourceIds, registerLessonsFunctions } from "../src/functions/lessons.js";
+import { currentAuditScope } from "./helpers/mocks.js";
 import type { Lesson } from "../src/types.js";
 
 function mockKV() {
@@ -470,7 +471,7 @@ describe("Lessons", () => {
 
       await sdk.trigger("mem::lesson-delete", { lessonId: saved.lesson.id });
 
-      const auditRows = (await kv.list("mem:audit")) as Array<{
+      const auditRows = (await kv.list(currentAuditScope())) as Array<{
         operation: string;
         targetIds: string[];
       }>;

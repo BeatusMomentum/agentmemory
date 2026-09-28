@@ -3,6 +3,7 @@ import { registerViewerStreamTriggers } from "../src/triggers/viewer-streams.js"
 import { registerEventTriggers } from "../src/triggers/events.js";
 import { getViewerCounts, resetViewerCounts } from "../src/state/viewer-counts.js";
 import { KV } from "../src/state/schema.js";
+import { recordAudit, setAuditRecordedListener } from "../src/functions/audit.js";
 
 type Handler = (payload: unknown) => Promise<unknown>;
 type Sent = { type: string; group_id: string; data: Record<string, unknown> };
@@ -69,6 +70,7 @@ describe("viewer stream triggers", () => {
   afterEach(() => {
     vi.useRealTimers();
     resetViewerCounts();
+    setAuditRecordedListener(null);
   });
 
   it("registers a state trigger for every scope the viewer shows", () => {
@@ -82,7 +84,6 @@ describe("viewer stream triggers", () => {
       KV.crystals,
       KV.semantic,
       KV.procedural,
-      KV.audit,
       KV.graphSnapshot,
       KV.graphNodes,
       KV.graphEdges,
@@ -96,7 +97,7 @@ describe("viewer stream triggers", () => {
   });
 
   it("pushes created, updated and deleted rows for lessons, actions, crystals, semantic, procedural and audit", async () => {
-    const { handlers, sent } = setup();
+    const { handlers, sent, kv } = setup();
     const lesson = { id: "l9", content: "use pnpm", confidence: 0.6 };
     await handlers.get("event::viewer::lesson-changed")!({ key: "l9", event_type: "state:created", new_value: lesson });
     await handlers.get("event::viewer::lesson-changed")!({
@@ -110,11 +111,7 @@ describe("viewer stream triggers", () => {
     await handlers.get("event::viewer::crystal-changed")!({ key: "c1", event_type: "state:created", new_value: { id: "c1" } });
     await handlers.get("event::viewer::semantic-changed")!({ key: "f1", event_type: "state:created", new_value: { id: "f1" } });
     await handlers.get("event::viewer::procedural-changed")!({ key: "p1", event_type: "state:created", new_value: { id: "p1" } });
-    await handlers.get("event::viewer::audit-changed")!({
-      key: "au1",
-      event_type: "state:created",
-      new_value: { id: "au1", operation: "forget", targetIds: ["m1"] },
-    });
+    await recordAudit(kv as never, "forget", "mem::forget", ["m1"]);
     expect(sent.map((e) => e.type)).toEqual([
       "lesson.created",
       "lesson.updated",
