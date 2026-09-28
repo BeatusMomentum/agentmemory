@@ -12,6 +12,7 @@ import type {
 import { importOrigin } from "../types.js";
 import type { StateKV } from "../state/kv.js";
 import { KV, generateId, fingerprintId } from "../state/schema.js";
+import { addSessionToProjectIndex } from "../state/session-index.js";
 import { withKeyedLock } from "../state/keyed-mutex.js";
 import { parseJsonlText } from "../replay/jsonl-parser.js";
 import { resetLessonIndex } from "./lessons.js";
@@ -395,7 +396,7 @@ export function registerReplayFunctions(sdk: IIIClient, kv: StateKV): void {
           ? firstPromptObs.userPrompt.replace(/\s+/g, " ").trim().slice(0, 200)
           : undefined;
 
-        await withKeyedLock(`obs:${parsed.sessionId}`, async () => {
+        const sessionRow = await withKeyedLock(`obs:${parsed.sessionId}`, async (): Promise<Session> => {
           const existing = await kv.get<Session>(KV.sessions, parsed.sessionId);
           if (existing) {
             existing.observationCount =
@@ -422,6 +423,7 @@ export function registerReplayFunctions(sdk: IIIClient, kv: StateKV): void {
             // fallback) and is what we just used to read the row.
             if (!existing.id) existing.id = parsed.sessionId;
             await kv.set(KV.sessions, parsed.sessionId, existing);
+            return existing;
           } else {
             const session: Session = {
               id: parsed.sessionId,
@@ -435,8 +437,15 @@ export function registerReplayFunctions(sdk: IIIClient, kv: StateKV): void {
               firstPrompt,
             };
             await kv.set(KV.sessions, session.id, session);
+            return session;
           }
         });
+
+        await addSessionToProjectIndex(kv, sessionRow.project, {
+          id: sessionRow.id,
+          startedAt: sessionRow.startedAt,
+          ...(sessionRow.agentId ? { agentId: sessionRow.agentId } : {}),
+        }).catch(() => {});
 
         const compressed: CompressedObservation[] = [];
         await Promise.all(

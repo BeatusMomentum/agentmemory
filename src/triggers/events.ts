@@ -2,6 +2,7 @@ import { TriggerAction, type IIIClient } from "iii-sdk";
 import type { CompressedObservation, HookPayload, Memory, Session } from "../types.js";
 import { KV, STREAM } from "../state/schema.js";
 import { StateKV } from "../state/kv.js";
+import { addSessionToProjectIndex } from "../state/session-index.js";
 import { withKeyedLock } from "../state/keyed-mutex.js";
 import { isReflectEnabled } from "../functions/slots.js";
 import {
@@ -77,6 +78,16 @@ export function registerEventTriggers(sdk: IIIClient, kv: StateKV): void {
         };
         await kv.set(KV.sessions, data.sessionId, merged);
         return merged;
+      });
+      await addSessionToProjectIndex(kv, session.project, {
+        id: session.id,
+        startedAt: session.startedAt,
+        ...(session.agentId ? { agentId: session.agentId } : {}),
+      }).catch((err) => {
+        logger.warn("session index update failed", {
+          sessionId: session.id,
+          error: err instanceof Error ? err.message : String(err),
+        });
       });
       const contextResult = await sdk.trigger<
         { sessionId: string; project: string; agentId?: string },

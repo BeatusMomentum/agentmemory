@@ -12,6 +12,7 @@ import type {
 } from "../types.js";
 import { KV, generateId } from "../state/schema.js";
 import type { StateKV } from "../state/kv.js";
+import { addSessionToProjectIndex } from "../state/session-index.js";
 import { withKeyedLock } from "../state/keyed-mutex.js";
 import { recordAudit } from "./audit.js";
 import { VERSION } from "../version.js";
@@ -199,6 +200,16 @@ export function registerSnapshotFunction(
             await withKeyedLock(`obs:${session.id}`, () =>
               kv.set(KV.sessions, session.id, session),
             );
+            const project = session.project;
+            const startedAt = session.startedAt;
+            if (typeof project === "string" && typeof startedAt === "string") {
+              const agentId = session.agentId;
+              await addSessionToProjectIndex(kv, project, {
+                id: session.id,
+                startedAt,
+                ...(typeof agentId === "string" ? { agentId } : {}),
+              }).catch(() => {});
+            }
           }
         }
         if (state.memories) {

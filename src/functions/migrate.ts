@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import { homedir } from "node:os";
 import { KV, generateId } from "../state/schema.js";
 import { StateKV } from "../state/kv.js";
+import { addSessionToProjectIndex } from "../state/session-index.js";
 import { withKeyedLock } from "../state/keyed-mutex.js";
 import type {
   Memory,
@@ -154,6 +155,11 @@ export function registerMigrateFunction(sdk: IIIClient, kv: StateKV): void {
           await withKeyedLock(`obs:${session.id}`, () =>
             kv.set(KV.sessions, session.id, session),
           );
+          await addSessionToProjectIndex(kv, session.project, {
+            id: session.id,
+            startedAt: session.startedAt,
+            ...(session.agentId ? { agentId: session.agentId } : {}),
+          }).catch(() => {});
           sessionCount++;
         }
 
