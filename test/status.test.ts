@@ -16,6 +16,7 @@ function inputs(overrides: Partial<StatusInputs> = {}): StatusInputs {
     version: "0.9.29",
     engineVersion: "0.22.1",
     uptimeSeconds: 125,
+    stateBackend: "file",
     ports: { rest: 3111, streams: 3112, viewer: 3113 },
     health: { status: "healthy", alerts: [], notes: [], connectionState: "connected" },
     circuitBreaker: { state: "closed", failures: 0 },
@@ -55,6 +56,12 @@ describe("evaluateStatus", () => {
     expect(report.problems).toEqual([]);
     expect(report.graph?.ageSeconds).toBe(60);
     expect(report.service.engineVersion).toBe("0.22.1");
+  });
+
+  it("surfaces the active state backend, never the URL", () => {
+    const report = evaluateStatus(inputs({ stateBackend: "redis" }));
+    expect(report.service.stateBackend).toBe("redis");
+    expect(JSON.stringify(report)).not.toMatch(/redis:\/\//);
   });
 
   it("flags a function failing at least 20% of 5+ calls with a provider-specific fix", () => {
@@ -404,6 +411,7 @@ describe("prefersHtml", () => {
 describe("status wiring", () => {
   const api = readFileSync("src/triggers/api.ts", "utf-8");
   const viewer = readFileSync("src/viewer/index.html", "utf-8");
+  const index = readFileSync("src/index.ts", "utf-8");
 
   it("registers GET /agentmemory/status behind the same auth check as the other endpoints", () => {
     expect(api).toMatch(/registerFunction\("api::status",\s*async \(req: HttpRequest\): Promise<Response> => \{\s*const authErr = checkAuth\(req, secret\);/);
@@ -436,6 +444,11 @@ describe("status wiring", () => {
   it("config flags and status share one flag list", () => {
     expect(api.match(/buildConfigFlags\(\)(?! \{)/g)?.length).toBe(2);
     expect(api.match(/key: "GRAPH_EXTRACTION_ENABLED"/g)?.length).toBe(1);
+  });
+
+  it("reports the active state backend from config, not a hardcoded value", () => {
+    expect(api).toMatch(/stateBackend: kv.backend === "redis" \? "redis" : "file"/);
+    expect(index).toMatch(/new StateKV\(sdk, \{ backend: stateBackend \}\)/);
   });
 
   it("the viewer has a Health tab that reads the status report", () => {
