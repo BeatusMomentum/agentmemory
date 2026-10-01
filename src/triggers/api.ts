@@ -1,4 +1,4 @@
-import { TriggerAction, type IIIClient } from "iii-sdk";
+import { InvocationError, TriggerAction, type IIIClient } from "iii-sdk";
 import type { HttpRequest } from "@iii-dev/helpers/http";
 import { randomBytes } from "node:crypto";
 import type { Session, CompressedObservation, HookPayload, CommitLink, SessionSummary, HealthSnapshot, AuditQueryResult, AuditMigrationState } from "../types.js";
@@ -2025,6 +2025,47 @@ export function registerApiTriggers(
     type: "http",
     function_id: "api::graph-reset",
     config: { api_path: "/agentmemory/graph/reset", http_method: "POST" },
+  });
+
+  sdk.registerFunction("api::graph-compact",
+    async (req: HttpRequest): Promise<Response> => {
+      const authErr = checkAuth(req, secret);
+      if (authErr) return authErr;
+      const body = (req.body ?? {}) as Record<string, unknown>;
+      const { scope, offset, limit } = body;
+      if (scope !== undefined && scope !== "nodes" && scope !== "edges" && scope !== "snapshot") {
+        return { status_code: 400, body: { error: "scope must be nodes, edges or snapshot" } };
+      }
+      if (offset !== undefined && !(Number.isInteger(offset) && (offset as number) >= 0)) {
+        return { status_code: 400, body: { error: "offset must be a non-negative integer" } };
+      }
+      if (limit !== undefined && !(Number.isInteger(limit) && (limit as number) >= 1)) {
+        return { status_code: 400, body: { error: "limit must be a positive integer" } };
+      }
+      try {
+        const result = await sdk.trigger({
+          function_id: "mem::graph-compact",
+          payload: { scope, offset, limit },
+        });
+        if ((result as { success?: boolean } | null)?.success === false) {
+          return { status_code: 500, body: { error: "Graph compaction failed" } };
+        }
+        return { status_code: 200, body: result };
+      } catch (err) {
+        if (err instanceof InvocationError && err.code === "TIMEOUT") {
+          return {
+            status_code: 504,
+            body: { error: "Graph compaction timed out; pass scope, offset and limit to run it in slices" },
+          };
+        }
+        return { status_code: 500, body: { error: "Graph compaction failed" } };
+      }
+    },
+  );
+  sdk.registerTrigger({
+    type: "http",
+    function_id: "api::graph-compact",
+    config: { api_path: "/agentmemory/graph/compact", http_method: "POST" },
   });
 
   sdk.registerFunction("api::graph-extract",
