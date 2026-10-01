@@ -1000,12 +1000,23 @@ export function registerApiTriggers(
           body: { error: "sessionId is required and must be a non-empty string" },
         };
       }
-      await withKeyedLock(`obs:${sessionId}`, () =>
-        kv.update(KV.sessions, sessionId, [
+      const endResult = await withKeyedLock(`obs:${sessionId}`, async () => {
+        const session = await kv.get<Session>(KV.sessions, sessionId);
+        if (!session || session.id !== sessionId) return "not_found" as const;
+        if (session.status === "completed") return "already_completed" as const;
+
+        await kv.update(KV.sessions, sessionId, [
           { type: "set", path: "endedAt", value: new Date().toISOString() },
           { type: "set", path: "status", value: "completed" },
-        ]),
-      );
+        ]);
+        return "ended" as const;
+      });
+      if (endResult !== "ended") {
+        return {
+          status_code: 200,
+          body: { success: true, ended: false, reason: endResult },
+        };
+      }
       // Fan out session-stopped lifecycle (non-blocking).
       try {
         sdk.trigger({
@@ -1019,7 +1030,7 @@ export function registerApiTriggers(
           error: err instanceof Error ? err.message : String(err),
         });
       }
-      return { status_code: 200, body: { success: true } };
+      return { status_code: 200, body: { success: true, ended: true } };
     },
   );
   sdk.registerTrigger({
@@ -1188,6 +1199,13 @@ export function registerApiTriggers(
       const authErr = checkAuth(req, secret);
       if (authErr) return authErr;
       const sessions = await kv.list<Session>(KV.sessions);
+      const validSessions = sessions.filter(
+        (session): session is Session =>
+          !!session &&
+          typeof session === "object" &&
+          typeof session.id === "string" &&
+          session.id.length > 0,
+      );
       const normalizedAgentId =
         typeof req.query_params?.["agentId"] === "string"
           ? req.query_params["agentId"].trim()
@@ -1201,14 +1219,14 @@ export function registerApiTriggers(
           (isAgentScopeIsolated() ? getAgentId() : undefined);
       const listQuery = parseListQuery(req.query_params);
       let filtered = filterAgentId
-        ? sessions.filter((s) => s.agentId === filterAgentId)
-        : sessions;
+        ? validSessions.filter((s) => s.agentId === filterAgentId)
+        : validSessions;
       const facets =
         req.query_params?.["facets"] === "true"
           ? sessionFacets(
               !wildcardAgent && isAgentScopeIsolated()
-                ? sessions.filter((s) => s.agentId === getAgentId())
-                : sessions,
+                ? validSessions.filter((s) => s.agentId === getAgentId())
+                : validSessions,
             )
           : undefined;
       if (listQuery.project) filtered = filtered.filter((s) => s.project === listQuery.project);
