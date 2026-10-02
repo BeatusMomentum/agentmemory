@@ -1,6 +1,7 @@
 import type { IndexLegStatus, IndexPersistenceStatus } from "../state/index-persistence.js";
 import type { VectorBackfillState } from "./search.js";
 import { describeGraphCompactBoot, type GraphCompactBootStatus } from "./graph-compact-boot.js";
+import type { CaptureStatus } from "./capture.js";
 
 export type StatusLevel = "ok" | "info" | "warn" | "error";
 
@@ -76,6 +77,13 @@ export interface StatusInputs {
   auditLegacy: { status: string; sizeBytes?: number } | null;
   indexPersistence?: IndexPersistenceStatus | null;
   stateStore?: { ok: boolean; latencyMs?: number } | null;
+  capture?: CaptureStatus | null;
+  observeDedup?: ObserveDedupStatus | null;
+}
+
+export interface ObserveDedupStatus {
+  skippedSinceStart: number;
+  windowSeconds: number;
 }
 
 export interface IndexBreakdown {
@@ -107,6 +115,8 @@ export interface StatusReport {
   indexPersistence: IndexPersistenceStatus | null;
   graph: (GraphStatsInput & { ageSeconds: number | null; extractionEnabled: boolean }) | null;
   graphCompaction: GraphCompactBootStatus | null;
+  capture: CaptureStatus | null;
+  observeDedup: ObserveDedupStatus | null;
   functions: Array<FunctionMetricInput & { failureRate: number; offWithoutLlm: boolean }>;
   flags: Array<StatusFlag & { inactiveReason?: string }>;
   problems: StatusProblem[];
@@ -436,6 +446,8 @@ export function evaluateStatus(input: StatusInputs): StatusReport {
     });
   }
 
+  problems.push(...captureProblems(input.capture ?? null, input.now, input.ports.rest));
+
   if (input.stateStore && !input.stateStore.ok) {
     problems.push({
       level: "error",
@@ -479,6 +491,8 @@ export function evaluateStatus(input: StatusInputs): StatusReport {
     indexPersistence: persistence,
     graph,
     graphCompaction: compaction,
+    capture: input.capture ?? null,
+    observeDedup: input.observeDedup ?? null,
     functions,
     flags: input.flags.map((flag) =>
       flag.enabled && flag.needsLlm && noLlm
@@ -487,6 +501,57 @@ export function evaluateStatus(input: StatusInputs): StatusReport {
     ),
     problems,
   };
+}
+
+const RECENT_DROP_MS = 24 * 60 * 60 * 1000;
+
+export function captureRestBase(restPort: number | null): string {
+  return `http://localhost:${restPort ?? 3111}/agentmemory`;
+}
+
+function captureProblems(capture: CaptureStatus | null, now: Date, restPort: number | null): StatusProblem[] {
+  if (!capture) return [];
+  const problems: StatusProblem[] = [];
+  const base = captureRestBase(restPort);
+  const inbox = capture.inbox;
+  if (inbox && inbox.dead > 0) {
+    problems.push({
+      level: "warn",
+      code: "capture-dead-letters",
+      message: `${plural(inbox.dead, "captured observation")} could not be stored after ${plural(capture.policy.maxAttempts, "attempt")} and ${inbox.dead === 1 ? "is parked as a dead letter" : "are parked as dead letters"}${inbox.lastError ? `: ${inbox.lastError}` : "."}`,
+      fix: `List them with curl -s '${base}/capture?status=dead'. After fixing the cause, retry them with curl -X POST ${base}/capture/retry -H "Content-Type: application/json" -d '{"all":true}'.`,
+    });
+  }
+  if (inbox && inbox.retrying + inbox.pending > 0) {
+    problems.push({
+      level: "info",
+      code: "capture-retrying",
+      message: `${plural(inbox.retrying + inbox.pending, "accepted observation")} ${inbox.retrying + inbox.pending === 1 ? "is" : "are"} waiting to be stored${inbox.lastError ? ` after a failure: ${inbox.lastError}` : ""}.`,
+      fix: `No action needed: the server retries every ${Math.round(capture.policy.retryIntervalMs / 1000)} s with backoff, up to ${capture.policy.maxAttempts} attempts, and again after a restart.`,
+    });
+  }
+  const waiting = capture.spool.reduce((n, s) => n + s.records, 0);
+  if (waiting > 0) {
+    problems.push({
+      level: "info",
+      code: "capture-spool-waiting",
+      message: `${plural(waiting, "observation")} captured while the server was unreachable ${waiting === 1 ? "is" : "are"} waiting in the local capture spool.`,
+      fix: `They are sent on the next hook call and at every start. To send them now: npx @agentmemory/agentmemory capture --drain, or curl -X POST ${base}/capture/drain.`,
+    });
+  }
+  for (const spool of capture.spool) {
+    const lastDrop = spool.stats.lastDropAt ? Date.parse(spool.stats.lastDropAt) : NaN;
+    if (Number.isFinite(lastDrop) && now.getTime() - lastDrop < RECENT_DROP_MS) {
+      problems.push({
+        level: "warn",
+        code: "capture-spool-dropped",
+        message: `The local capture spool dropped ${plural(spool.stats.dropped, "observation")} in total (latest reason: ${spool.stats.lastDropReason ?? "unknown"}), so those tool calls are not in memory.`,
+        fix: `The spool holds at most ${Math.round(spool.maxBytes / 1024)} KiB for ${spool.maxAgeHours} hours. Raise AGENTMEMORY_CAPTURE_SPOOL_MAX_BYTES, keep agentmemory running while agents work, or check that AGENTMEMORY_CAPTURE_SPOOL is not false.`,
+      });
+      break;
+    }
+  }
+  return problems;
 }
 
 function statusHeadline(status: StatusLevel, problems: StatusProblem[]): string {
@@ -596,6 +661,43 @@ function indexPersistenceRows(report: StatusReport): string {
       );
     }
   }
+  return rows;
+}
+
+export function describeCaptureSpool(capture: CaptureStatus): string {
+  const records = capture.spool.reduce((n, s) => n + s.records, 0);
+  const bytes = capture.spool.reduce((n, s) => n + s.bytes, 0);
+  if (!capture.spool.some((s) => s.enabled)) return "off (AGENTMEMORY_CAPTURE_SPOOL=false)";
+  const retained = capture.spool.reduce((n, s) => n + (s.retained ?? 0), 0);
+  const held = retained > 0 ? `, ${retained} sent and kept until saved` : "";
+  return records === 0 ? `empty${held}` : `${plural(records, "observation")} waiting, ${Math.ceil(bytes / 1024)} KiB${held}`;
+}
+
+function captureRows(report: StatusReport): string {
+  const capture = report.capture;
+  if (!capture) return row("Capture", "not reported");
+  const inbox = capture.inbox;
+  const since = capture.sinceStart;
+  let rows = row(
+    "Inbox",
+    escapeHtml(inbox ? `${inbox.pending} pending · ${inbox.retrying} retrying · ${inbox.dead} dead letters` : "not checked") +
+      '<p class="note">Every accepted observation is written here first and removed once it is stored, so a failure or restart retries it instead of losing it.</p>',
+  );
+  rows += row(
+    "Since start",
+    escapeHtml(`${since.accepted} accepted · ${since.completed} stored · ${since.duplicates} duplicates skipped · ${since.recovered} recovered by retry · ${since.deadLettered} dead`),
+  );
+  rows += row(
+    "Local spool",
+    escapeHtml(describeCaptureSpool(capture)) +
+      `<p class="note">Hooks write here when the server is unreachable, and keep each accepted observation here until the server has saved it to disk. ${escapeHtml(capture.spool.map((s) => s.path).join(", "))}</p>`,
+  );
+  const drained = capture.spool.map((s) => s.stats.lastDrainAt).filter(Boolean).sort().pop();
+  if (drained) rows += row("Last spool drain", escapeHtml(`${formatDuration(secondsBetween(new Date(report.checkedAt), drained))} ago`));
+  rows += row(
+    "Duplicate protection",
+    escapeHtml(`event ids kept ${capture.policy.dedupRetentionHours} h, retries up to ${plural(capture.policy.maxAttempts, "attempt")}`),
+  );
   return rows;
 }
 
@@ -727,6 +829,10 @@ ${row("Keyword index rebuild", idx.bm25Incomplete ? '<span class="warn">incomple
 ${row("Pending vector backfill", escapeHtml(idx.pendingVectorBackfill))}
 ${idx.vectorBackfillState ? row("Vector backfill", escapeHtml(describeBackfillState(idx.vectorBackfillState))) : ""}
 ${indexPersistenceRows(report)}
+</table>
+<h2>Capture</h2><table>
+${captureRows(report)}
+${report.observeDedup ? row("Repeats skipped", escapeHtml(`${report.observeDedup.skippedSinceStart} since start`) + `<p class="note">${escapeHtml(`A tool call with the same input and the same output as one stored in the last ${formatDuration(report.observeDedup.windowSeconds)} is skipped when the hook sends no event id.`)}</p>`) : ""}
 </table>
 <h2>Knowledge graph</h2><table>
 ${graph

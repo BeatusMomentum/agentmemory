@@ -1,4 +1,5 @@
 import { InvocationError, TriggerAction, type IIIClient } from "iii-sdk";
+import { DEDUP_WINDOW_MS, getDedupSkippedCount } from "../functions/dedup.js";
 import type { HttpRequest } from "@iii-dev/helpers/http";
 import { randomBytes } from "node:crypto";
 import type { Session, CompressedObservation, HookPayload, CommitLink, SessionSummary, HealthSnapshot, AuditQueryResult, AuditMigrationState } from "../types.js";
@@ -47,6 +48,8 @@ import { COMPACT_SCOPES, type GraphCompactScope } from "../functions/graph.js";
 import { getGraphCompactBootStatus } from "../functions/graph-compact-boot.js";
 import { LESSON_SOURCE_IDS_MAX, normalizeLessonSourceIds } from "../functions/lessons.js";
 import { logger } from "../logger.js";
+import { isValidEventId } from "../capture/event-id.js";
+import { getCaptureController, type CaptureResult } from "../functions/capture.js";
 import { withoutObservationSource } from "../functions/observation-source.js";
 import {
   isGraphExtractionEnabled,
@@ -166,6 +169,21 @@ function reflectDisabledResponse(): Response {
     enableHow: "Set AGENTMEMORY_REFLECT=true (in ~/.agentmemory/.env or the shell) and restart. Requires AGENTMEMORY_SLOTS=true.",
     docsHref: "https://github.com/rohitg00/agentmemory#memory-slots",
   });
+}
+
+export function captureStatusCode(result: CaptureResult): number {
+  if (result.status === "duplicate") return 200;
+  if (result.status === "accepted") return result.state === "completed" ? 201 : 202;
+  return result.retryable ? 503 : 422;
+}
+
+export function captureResponseBody(
+  result: CaptureResult,
+  durability?: { bootId: string; durableAfterMs: number } | null,
+): Record<string, unknown> {
+  if (result.status === "rejected") return { ...result, success: false };
+  if (!durability) return { ...result };
+  return { ...result, bootId: durability.bootId, acceptedAt: new Date().toISOString(), durableAfterMs: durability.durableAfterMs };
 }
 
 function asNonEmptyString(value: unknown): string | null {
@@ -362,7 +380,7 @@ export function createStatusReporter(sdk: IIIClient, kv: StateKV, deps: StatusRe
     const cached = scan.last && options.scanMaxAgeMs !== undefined && Date.now() - scan.last.at < options.scanMaxAgeMs
       ? scan.last.value
       : null;
-    const [health, functionMetrics, graph, unindexed, auditMigrationState, stateStore] = await Promise.all([
+    const [health, functionMetrics, graph, unindexed, auditMigrationState, stateStore, capture] = await Promise.all([
       options.health !== undefined ? Promise.resolve(options.health) : valueWithin(getLatestHealth(kv), STATUS_CHECK_TIMEOUT_MS),
       deps.metricsStore ? valueWithin(deps.metricsStore.getAll(), STATUS_CHECK_TIMEOUT_MS) : Promise.resolve([]),
       valueWithin(
@@ -375,6 +393,7 @@ export function createStatusReporter(sdk: IIIClient, kv: StateKV, deps: StatusRe
         STATUS_CHECK_TIMEOUT_MS,
       ),
       probeStateStore(kv),
+      valueWithin(getCaptureController()?.status() ?? Promise.resolve(null), STATUS_CHECK_TIMEOUT_MS),
     ]);
     const observationsIndexed = [...idx.observationCountsBySession().values()].reduce((a, n) => a + n, 0);
     const documentKinds = idx.documentKindCounts();
@@ -431,6 +450,8 @@ export function createStatusReporter(sdk: IIIClient, kv: StateKV, deps: StatusRe
         : null,
       indexPersistence: getIndexPersistenceStatus(),
       stateStore,
+      capture: capture ?? null,
+      observeDedup: { skippedSinceStart: getDedupSkippedCount(), windowSeconds: Math.round(DEDUP_WINDOW_MS / 1000) },
     });
   };
 }
@@ -652,6 +673,16 @@ export function registerApiTriggers(
           },
         };
       }
+      const eventId = body.eventId;
+      if (eventId !== undefined && !isValidEventId(eventId)) {
+        return {
+          status_code: 400,
+          body: {
+            status: "rejected",
+            error: "eventId must be 8 to 128 characters of letters, digits, '_', '.', ':' or '-'",
+          },
+        };
+      }
       const payload: HookPayload = {
         hookType: hookType as HookPayload["hookType"],
         sessionId,
@@ -660,10 +691,77 @@ export function registerApiTriggers(
         timestamp,
         data: body.data,
       };
-      const result = await sdk.trigger({ function_id: "mem::observe", payload });
-      return { status_code: 201, body: result };
+      const result = await sdk.trigger<unknown, CaptureResult>({
+        function_id: "mem::capture",
+        payload: { payload, eventId },
+      });
+      return {
+        status_code: captureStatusCode(result),
+        body: captureResponseBody(result, getCaptureController()?.durability() ?? null),
+      };
     },
   );
+
+  sdk.registerFunction("api::capture",
+    async (req: HttpRequest): Promise<Response> => {
+      const authErr = checkAuth(req, secret);
+      if (authErr) return authErr;
+      const status = req.query_params?.["status"];
+      const limit = Number(req.query_params?.["limit"]) || 50;
+      const [summary, list] = await Promise.all([
+        getCaptureController()?.status() ?? Promise.resolve(null),
+        sdk.trigger({
+          function_id: "mem::capture-list",
+          payload: {
+            ...(status === "pending" || status === "retrying" || status === "dead" ? { status } : {}),
+            limit,
+          },
+        }),
+      ]);
+      return { status_code: 200, headers: { "Cache-Control": "no-store" }, body: { capture: summary, ...(list as object) } };
+    },
+  );
+  sdk.registerTrigger({
+    type: "http",
+    function_id: "api::capture",
+    config: { api_path: "/agentmemory/capture", http_method: "GET" },
+  });
+
+  sdk.registerFunction("api::capture-retry",
+    async (req: HttpRequest<{ eventId?: string; all?: boolean }>): Promise<Response> => {
+      const authErr = checkAuth(req, secret);
+      if (authErr) return authErr;
+      const body = (req.body ?? {}) as { eventId?: unknown; all?: unknown };
+      const eventId = asNonEmptyString(body.eventId);
+      if (!eventId && body.all !== true) {
+        return { status_code: 400, body: { error: "pass an eventId, or all: true to retry every dead or waiting capture" } };
+      }
+      const result = await sdk.trigger({
+        function_id: "mem::capture-retry",
+        payload: eventId ? { eventId } : { all: true },
+      });
+      return { status_code: 200, body: result };
+    },
+  );
+  sdk.registerTrigger({
+    type: "http",
+    function_id: "api::capture-retry",
+    config: { api_path: "/agentmemory/capture/retry", http_method: "POST" },
+  });
+
+  sdk.registerFunction("api::capture-drain",
+    async (req: HttpRequest): Promise<Response> => {
+      const authErr = checkAuth(req, secret);
+      if (authErr) return authErr;
+      const result = await sdk.trigger({ function_id: "mem::capture-drain", payload: {} });
+      return { status_code: 200, body: result };
+    },
+  );
+  sdk.registerTrigger({
+    type: "http",
+    function_id: "api::capture-drain",
+    config: { api_path: "/agentmemory/capture/drain", http_method: "POST" },
+  });
   sdk.registerTrigger({
     type: "http",
     function_id: "api::observe",

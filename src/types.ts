@@ -66,6 +66,8 @@ export interface RawObservation {
   imageData?: string;
   agentId?: string;
   origin?: Origin;
+  eventId?: string;
+  captureKey?: string;
 }
 
 export interface ObservationSource {
@@ -100,6 +102,7 @@ export interface CompressedObservation {
   modality?: "text" | "image" | "mixed";
   agentId?: string;
   origin?: Origin;
+  captureKey?: string;
 }
 
 export type ObservationType =
@@ -177,6 +180,9 @@ export interface HookPayload {
   cwd: string;
   timestamp: string;
   data: unknown;
+  eventId?: string;
+  observationId?: string;
+  captureKey?: string;
 }
 
 export interface ProviderConfig {
