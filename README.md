@@ -1194,7 +1194,7 @@ Auto-starts on port `3113`. Live observation stream with a stream status indicat
 open http://localhost:3113
 ```
 
-The viewer server binds to `127.0.0.1` by default. The REST-served `/agentmemory/viewer` endpoint follows the normal `AGENTMEMORY_SECRET` bearer-token rules. CSP headers use a per-response script nonce and disable inline handler attributes (`script-src-attr 'none'`).
+The viewer server binds to `127.0.0.1` by default and attaches the server secret when it forwards requests to the REST API, so it needs no setup. The REST-served `/agentmemory/viewer` endpoint follows the normal bearer-token rules and redirects browsers without a token to the viewer port. CSP headers use a per-response script nonce and disable inline handler attributes (`script-src-attr 'none'`).
 
 ---
 
@@ -1325,6 +1325,9 @@ The rendered config keeps the URL out of `~/.agentmemory/data/iii-config.runtime
 **Migration is not automatic.** Switching `AGENTMEMORY_STATE_BACKEND` starts from an empty store on either side; nothing copies existing data from file to Redis or back. Export from the backend you're leaving and import into the one you're moving to. This runs identically under bash and zsh (including `bash -u`). An array like `AUTH=(${AGENTMEMORY_SECRET:+-H "Authorization: Bearer $AGENTMEMORY_SECRET"})` does not: zsh keeps the header as one malformed word where bash splits it into two, so both requests 401 whenever `AGENTMEMORY_SECRET` is set:
 
 ```bash
+# 0. Use the generated secret when none is exported:
+AGENTMEMORY_SECRET="${AGENTMEMORY_SECRET:-$(cat ~/.agentmemory/secret 2>/dev/null)}"
+
 # 1. On the old backend, while agentmemory is still running on it:
 if [ -n "${AGENTMEMORY_SECRET:-}" ]; then
   curl -fsS -H "Authorization: Bearer $AGENTMEMORY_SECRET" http://localhost:3111/agentmemory/export > backup.json
@@ -1601,8 +1604,10 @@ Create `~/.agentmemory/.env`:
 # VECTOR_WEIGHT=0.6
 # TOKEN_BUDGET=2000
 
-# Auth
+# Auth (generated into ~/.agentmemory/secret on first start when unset)
 # AGENTMEMORY_SECRET=your-secret
+# VIEWER_ALLOWED_ORIGINS=https://memory.example.com
+# AGENTMEMORY_IMPORT_ROOT=~/projects
 
 # Ports (defaults: 3111 API, 3113 viewer)
 # III_REST_PORT=3111
@@ -1673,7 +1678,19 @@ Create `~/.agentmemory/.env`:
 
 <h2 id="api"><picture><source media="(prefers-color-scheme: dark)" srcset="assets/tags/light/section-api.svg"><img src="assets/tags/section-api.svg" alt="API" height="32" /></picture></h2>
 
-135 endpoints on port `3111`. The REST API binds to `127.0.0.1` by default. Protected endpoints require `Authorization: Bearer <secret>` when `AGENTMEMORY_SECRET` is set, and mesh sync endpoints require `AGENTMEMORY_SECRET` on both peers.
+135 endpoints on port `3111`. The REST API binds to `127.0.0.1` by default. Protected endpoints require `Authorization: Bearer <secret>`, and mesh sync endpoints require an explicitly set `AGENTMEMORY_SECRET` on both peers.
+
+**Authentication is on by default.** When `AGENTMEMORY_SECRET` is not set (in the shell or in `~/.agentmemory/.env`), the server generates a random secret on first start and stores it in `~/.agentmemory/secret` with mode `0600`. Every bundled client reads it from there when it talks to a local server: the CLI, the viewer, the hooks under `plugin/scripts`, the MCP server and the `@agentmemory/mcp` shim, the configs written by `agentmemory connect`, and the bundled OpenCode, Pi, OpenClaw, Hermes and filesystem-watcher integrations. The stored secret is only sent to loopback URLs (`localhost`, `127.0.0.0/8`, `::1`). An explicit `AGENTMEMORY_SECRET` always wins, and remote clients still need it set. Docker and the `deploy/` entrypoints already generate and export their own secret. To call the API by hand:
+
+```bash
+curl -H "Authorization: Bearer $(cat ~/.agentmemory/secret)" http://localhost:3111/agentmemory/health
+```
+
+**Request rules for writes.** `POST`, `PUT`, `PATCH` and `DELETE` requests to the REST API and the viewer must send `Content-Type: application/json` (a `charset` parameter is fine) whenever they carry a body, and an `Origin` header, when present, must be a loopback origin for the configured REST or viewer port or be listed in `VIEWER_ALLOWED_ORIGINS` (comma-separated, e.g. `https://memory.example.com`). Clients that send no `Origin` header (CLI, hooks, MCP, curl, server-to-server) are unaffected. The viewer also accepts its own origin.
+
+**File paths.** Endpoints that read or write files (`/compress-file`, `/replay/import-jsonl`, `/graph/import-graphify`) only accept paths under `~/.agentmemory`, the instance data directory, or a directory listed in `AGENTMEMORY_IMPORT_ROOT` (separate several with `:`, or `;` on Windows). `/replay/import-jsonl` also accepts its default `~/.claude/projects`. `/obsidian/export` stays inside `AGENTMEMORY_EXPORT_ROOT` and `/migrate` inside `~/.agentmemory`. Symlinks are resolved before every check.
+
+**Secret scrubbing.** API keys, bearer tokens, PEM private key blocks and credentials embedded in URLs (`scheme://user:password@host`) are redacted before text is stored, on every write path: observations, remember, evolve, slots, lessons, actions, sketches, signals, checkpoints, imports, jsonl replay, mesh sync, team shares, compression and summary output, crystals and graph nodes.
 
 <details>
 <summary>Key endpoints</summary>

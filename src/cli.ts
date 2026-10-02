@@ -92,6 +92,7 @@ import { knownAgents } from "./cli/connect/index.js";
 const ALL_TOOLS_COUNT = getAllTools().length;
 const CORE_TOOLS_COUNT = getAllTools().filter((t) => ESSENTIAL_TOOLS.has(t.name)).length;
 import { resolveDataDir } from "./cli-data-dir.js";
+import { bearerHeaders } from "./secret-store.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const args = process.argv.slice(2);
@@ -2166,9 +2167,7 @@ async function main() {
 
 async function apiFetch<T = unknown>(base: string, path: string, timeoutMs = 5000): Promise<T | null> {
   try {
-    const headers: Record<string, string> = {};
-    const secret = process.env["AGENTMEMORY_SECRET"];
-    if (secret) headers["Authorization"] = `Bearer ${secret}`;
+    const headers: Record<string, string> = bearerHeaders(base);
     const res = await fetch(`${base}/agentmemory/${path}`, {
       signal: AbortSignal.timeout(timeoutMs),
       headers,
@@ -2809,7 +2808,7 @@ async function postJson<T = unknown>(
   try {
     const res = await fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...bearerHeaders(url) },
       body: JSON.stringify(body),
       signal: AbortSignal.timeout(timeoutMs),
     });
@@ -2827,7 +2826,7 @@ async function postJsonStrict<T = unknown>(
 ): Promise<T | null> {
   const res = await fetch(url, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...bearerHeaders(url) },
     body: JSON.stringify(body),
     signal: AbortSignal.timeout(timeoutMs),
   });
@@ -2869,7 +2868,7 @@ async function seedDemoSession(
     try {
       const res = await fetch(url, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...bearerHeaders(url) },
         body: JSON.stringify(payload),
         signal: AbortSignal.timeout(5000),
       });
@@ -3755,12 +3754,10 @@ async function runImportJsonl(): Promise<void> {
   }
 
   const body: Record<string, unknown> = {};
-  if (pathArg) body["path"] = pathArg;
+  if (pathArg) body["path"] = resolve(pathArg.startsWith("~") ? join(homedir(), pathArg.slice(1)) : pathArg);
   if (maxFiles !== undefined) body["maxFiles"] = maxFiles;
 
-  const headers: Record<string, string> = { "content-type": "application/json" };
-  const secret = process.env["AGENTMEMORY_SECRET"];
-  if (secret) headers["authorization"] = `Bearer ${secret}`;
+  const headers: Record<string, string> = { "content-type": "application/json", ...bearerHeaders(base) };
 
   p.log.info(`Importing JSONL from ${pathArg || "~/.claude/projects"}…`);
   const spinner = p.spinner();
