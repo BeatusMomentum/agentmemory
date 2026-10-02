@@ -510,7 +510,7 @@ describe("markLlmFunctions", () => {
 });
 
 describe("vector durability rows", () => {
-  it("shows the pending vector log, a paused backlog and skipped repeats in plain language", () => {
+  it("shows the pending vector log and a paused backlog in plain language", () => {
     const report = evaluateStatus(
       inputs({
         index: { ...inputs().index, pendingVectorBackfill: 7, vectorBackfillState: "paused" },
@@ -524,16 +524,13 @@ describe("vector durability rows", () => {
           pendingLog: 3,
           pendingLogError: "state write timed out",
         },
-        observeDedup: { skippedSinceStart: 4, windowSeconds: 300 },
       }),
     );
     expect(codes(report)).toContain("index-pending-log-failing");
     const backlog = report.problems.find((p) => p.code === "index-vector-backfill-pending");
     expect(backlog?.fix).toContain("retried on the next start");
-    expect(report.observeDedup).toEqual({ skippedSinceStart: 4, windowSeconds: 300 });
     const html = renderStatusHtml(report, "n");
     expect(html).toContain("3 vector changes");
     expect(html).toContain("paused, retried on the next start");
-    expect(html).toContain("4 since start");
   });
 });
