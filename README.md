@@ -50,7 +50,7 @@
   <picture><source media="(prefers-color-scheme: dark)" srcset="assets/tags/light/stat-tools.svg"><img src="assets/tags/stat-tools.svg" alt="54 MCP tools" height="38" /></picture>
   <picture><source media="(prefers-color-scheme: dark)" srcset="assets/tags/light/stat-hooks.svg"><img src="assets/tags/stat-hooks.svg" alt="12 auto hooks" height="38" /></picture>
   <picture><source media="(prefers-color-scheme: dark)" srcset="assets/tags/light/stat-deps.svg"><img src="assets/tags/stat-deps.svg" alt="0 external DBs" height="38" /></picture>
-  <picture><source media="(prefers-color-scheme: dark)" srcset="assets/tags/light/stat-tests.svg"><img src="assets/tags/stat-tests.svg" alt="1,674+ tests passing" height="38" /></picture>
+  <picture><source media="(prefers-color-scheme: dark)" srcset="assets/tags/light/stat-tests.svg"><img src="assets/tags/stat-tests.svg" alt="2,500+ tests passing" height="38" /></picture>
 </p>
 
 <p align="center">
@@ -611,31 +611,33 @@ codex plugin add agentmemory@agentmemory
 
 The Codex plugin ships from the same `plugin/` directory as the Claude Code plugin. It registers:
 
-- `@agentmemory/mcp` as an MCP server (proxies all 54 tools when `AGENTMEMORY_URL` points at a running agentmemory server; falls back to 7 tools locally when no server is reachable)
+- A bundled stdio MCP bridge to the running daemon, with no npm download or fallback store. See the [local Codex guide](docs/plugins/codex-local.md) to test an unreleased build.
 - 6 lifecycle hooks: `SessionStart`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `PreCompact`, `Stop`
 - 9 invocable skills: `/recall`, `/remember`, `/session-history`, `/forget`, `/recap`, `/handoff`, `/lesson`, `/commit-context`, `/commit-history`, plus 8 reference skills the agent loads on demand (memory discipline, MCP tools, REST API, config, agents, hooks, architecture, and the skill-authoring guide)
 
 Codex's hook engine injects `CLAUDE_PLUGIN_ROOT` into hook subprocesses (per [`codex-rs/hooks/src/engine/discovery.rs`](https://github.com/openai/codex/blob/main/codex-rs/hooks/src/engine/discovery.rs)), so the same hook scripts work across both hosts without duplication. Subagent / SessionEnd / Notification / TaskCompleted / PostToolUseFailure events are Claude-Code-only and are not registered for Codex.
 
-#### Codex Desktop: plugin hooks currently silent (workaround available)
+#### Codex hook trust and compatibility
 
-`CodexHooks` and `PluginHooks` are both stable + default-enabled in [`codex-rs/features/src/lib.rs`](https://github.com/openai/codex/blob/main/codex-rs/features/src/lib.rs), but Codex Desktop builds currently do not dispatch plugin-local `hooks.json` ([openai/codex#16430](https://github.com/openai/codex/issues/16430)). MCP tools still work; only the lifecycle observations are missing.
+Native plugin hook dispatch is verified with Codex CLI 0.150.1. Trust the plugin hooks before expecting capture. Desktop behavior depends on its bundled runtime; check `/hooks` and confirm a captured event before enabling a workaround.
 
-Until upstream lands the fix, mirror the same hook commands into the global `~/.codex/hooks.json`:
+If your host requires global hooks, mirror the commands into `~/.codex/hooks.json`. When MCP is already wired, the current connector needs `--force` to reach hook installation:
 
 ```bash
-agentmemory connect codex --with-hooks
+agentmemory connect codex --with-hooks --force
 ```
 
-This adds an idempotent block to `~/.codex/hooks.json` referencing absolute paths to the bundled scripts (no `${CLAUDE_PLUGIN_ROOT}` expansion needed at user-scope). Re-run the same command after upgrading agentmemory to refresh paths. User entries in the same file are preserved; only previous agentmemory entries are replaced.
+This merges global hooks and rewrites the agentmemory MCP entry, preserving unrelated entries. Review any custom agentmemory endpoint settings before using `--force`. Re-run after upgrading to refresh script paths. Enable either native plugin hooks or global copies to avoid duplicate capture.
 
 ### GitHub Copilot CLI
+
+For VS Code agent mode, use the [Copilot MCP and automatic-capture guide](docs/plugins/copilot.md#vs-code-copilot-local-agent-sessions). The CLI connector does not configure VS Code.
 
 ```bash
 # MCP-only wiring
 agentmemory connect copilot-cli
 
-# Full hooks/skills plugin from the GitHub subdir
+# Alternatively, full hooks/skills plugin from the GitHub subdir
 copilot plugin install rohitg00/agentmemory:plugin
 ```
 
@@ -739,14 +741,14 @@ The agentmemory entry is the **same MCP server block** across every host that us
 | **GitHub Copilot CLI (full plugin)** | Copilot plugin install | `copilot plugin install rohitg00/agentmemory:plugin` for the plugin from the GitHub subdir. |
 | **OpenClaw** | OpenClaw MCP config | Same `mcpServers` block. Deeper: `openclaw plugins install ./integrations/openclaw` claims OpenClaw's memory slot (auto-switches from `memory-core`); set `plugins.entries.agentmemory.hooks.allowConversationAccess=true` or turn capture is silently blocked. See [`integrations/openclaw`](integrations/openclaw/). |
 | **Codex CLI (MCP only)** | `.codex/config.toml` | TOML shape: `codex mcp add agentmemory -- npx -y @agentmemory/mcp`, or add `[mcp_servers.agentmemory]` manually. |
-| **Codex CLI (full plugin)** | Codex plugin marketplace | `codex plugin marketplace add rohitg00/agentmemory` then `codex plugin add agentmemory@agentmemory`. Registers MCP + 6 lifecycle hooks (SessionStart, UserPromptSubmit, PreToolUse, PostToolUse, PreCompact, Stop) + 17 skills. On Codex Desktop, also run `agentmemory connect codex --with-hooks` until [openai/codex#16430](https://github.com/openai/codex/issues/16430) lands; plugin hooks are currently silent there. |
+| **Codex CLI (full plugin)** | Codex plugin marketplace | `codex plugin marketplace add rohitg00/agentmemory` then `codex plugin add agentmemory@agentmemory`. Registers MCP + 6 lifecycle hooks + 17 skills. Trust hooks and verify capture in your host; see [Codex setup and validation](docs/plugins/codex-local.md). |
 | **OpenCode (MCP only)** | `opencode.json` | Different shape: top-level `mcp` key, command as array: `{"mcp": {"agentmemory": {"type": "local", "command": ["npx", "-y", "@agentmemory/mcp"], "enabled": true}}}`. |
 | **OpenCode (full plugin)** | `plugin/opencode/` | 22 auto-capture hooks covering session lifecycle, messages, tools, errors. Project attribution is per-session, so one OpenCode process spanning several repositories files each session under its own project. Two slash commands (`/recall`, `/remember`). Copy `plugin/opencode/` into your OpenCode workspace and add the plugin entry to `opencode.json`. See [`plugin/opencode/README.md`](plugin/opencode/README.md) for the full hook table + gap analysis. |
 | **pi** | `~/.pi/agent/extensions/agentmemory` | `agentmemory connect pi` installs the bundled extension into pi's auto-discovery directory (recall on agent start, capture on agent end, `memory_search` / `memory_save` / `memory_health` tools, `/agentmemory-status`). `/reload` in a running pi picks it up. [`integrations/pi`](integrations/pi/) is also a pi package (`pi install ./integrations/pi` from a checkout). |
 | **Hermes Agent** | `~/.hermes/config.yaml` | `cp -r integrations/hermes ~/.hermes/plugins/agentmemory` + `memory.provider: agentmemory` gives the 6-hook memory provider (prefetch, turn capture, session end, pre-compress, MEMORY.md mirroring, system prompt block). Validate with `hermes plugins doctor` and `hermes memory status`. See [`integrations/hermes`](integrations/hermes/). |
 | **Qwen Code** | `~/.qwen/settings.json` | `agentmemory connect qwen` writes the standard `mcpServers` block. Hook payload is field-compatible with Claude Code, so the existing 12-hook scripts work without modification; wire them via the `hooks` section in the same `settings.json`. |
-| **Antigravity** (replaces Gemini CLI) | `mcp_config.json` (in Antigravity's User dir) | `agentmemory connect antigravity` writes the standard `mcpServers` block. macOS: `~/Library/Application Support/Antigravity/User/`. Linux: `~/.config/Antigravity/User/`. Use after the 2026-06-18 Gemini CLI sunset. |
-| **Antigravity CLI** (`agy`) | `~/.gemini/config/mcp_config.json` | `agentmemory connect antigravity-cli`. The `agy` CLI keeps its own config under `~/.gemini/`, separate from the Antigravity IDE above. Pass `--with-hooks` for native auto-capture via `~/.gemini/config/hooks.json`. |
+| **Antigravity IDE / 2.0** | `~/.gemini/config/mcp_config.json` | `agentmemory connect antigravity --with-hooks` installs MCP and capture hooks in the shared customization directory. See [Antigravity setup and limits](docs/plugins/antigravity.md). |
+| **Antigravity CLI** (`agy`) | `~/.gemini/config/mcp_config.json` | `agentmemory connect antigravity-cli --with-hooks` uses the same MCP and hook configuration as current IDE versions. Existing installations should refresh with `--force`; see the [upgrade notes](docs/plugins/antigravity.md). |
 | **Kiro** | `~/.kiro/settings/mcp.json` | `agentmemory connect kiro` writes the user-level config. Workspace overrides go in `.kiro/settings/mcp.json` next to your code. |
 | **Warp** | `~/.warp/.mcp.json` | `agentmemory connect warp` writes the standard `mcpServers` block. Warp also auto-discovers skills from `.claude/skills/`; once the Claude Code plugin is installed the 8 agentmemory skills (`remember`, `recall`, `recap`, `handoff`, `forget`, `commit-context`, `commit-history`, `session-history`) appear natively in Warp's slash-command palette. |
 | **Cline (CLI)** | `~/.cline/mcp.json` | `agentmemory connect cline` writes the standard `mcpServers` block. VS Code extension users: paste the same block via Cline Settings → MCP Servers → Edit JSON. |
@@ -1190,7 +1192,14 @@ cp plugin/opencode/commands/*.md ~/.config/opencode/commands/
 
 <h2 id="real-time-viewer"><picture><source media="(prefers-color-scheme: dark)" srcset="assets/tags/light/section-viewer.svg"><img src="assets/tags/section-viewer.svg" alt="Real-Time Viewer" height="32" /></picture></h2>
 
-Auto-starts on port `3113`. Live observation stream with a stream status indicator, a two-pane session explorer (list beside a sticky detail panel on wide screens), memory and lesson rows that expand to the full stored record including raw JSON and origin provenance, a knowledge graph that clusters nodes by type while relations are sparse, session replay, and a health dashboard.
+Auto-starts on port `3113`. The viewer loads one snapshot when it connects (`GET /agentmemory/viewer/snapshot`) and then applies live stream events: new memories, lessons, observations, audit entries, graph changes and health updates appear without polling or page reloads. The only other requests are the actions you click, "load more" pages and searches. When the stream drops, the viewer shows how old its numbers are, reconnects with backoff and resyncs from one snapshot.
+
+- **12 tabs in four groups** with live counts, deep links (`#memories/<id>`, `#sessions/<id>?obs=<id>`, `#graph/<id>`, `#health/consolidation`), keyboard shortcuts and a mobile menu.
+- **Memories:** server-side search, filters by project, agent and type, a detail panel with the version chain and a word diff, provenance links, copy buttons for the id, the MCP call and a curl command, edit (a new version), forget with confirmation, bulk forget and JSON export.
+- **Sessions:** an inline observation timeline with readable tool input and output, filters and paging, and the memories and lessons each session produced.
+- **Graph:** search, node detail with relations and sources, a legend that does not rely on colour alone, and zoom controls.
+- **Health:** the live version of `GET /agentmemory/status`. Every problem comes with its fix, plus the state backend, index save state, graph provenance compaction progress and a consolidation explainer with the real thresholds.
+- **Audit, Activity, Profile, Replay, Lessons, Actions and Crystals** pages, each with an empty state that says what the section is, why it is empty and the command that fills it, and a `?` glossary tooltip on every term and number.
 
 ```bash
 open http://localhost:3113
@@ -1377,7 +1386,7 @@ fi
 | Prometheus / Grafana | iii OTEL + health monitor |
 | Custom plugin systems | `iii worker add <name>` |
 
-**184 source files · ~42,200 LOC · 1,674 tests · 264 functions · 50 KV scopes**, all on three primitives. No `agentmemory plugin install`. The plugin system is iii itself.
+**219 source files · ~52,000 LOC · 2,500+ tests · 311 functions · 60 KV scopes**, all on three primitives. No `agentmemory plugin install`. The plugin system is iii itself.
 
 ---
 
@@ -1677,6 +1686,36 @@ Create `~/.agentmemory/.env`:
 # CLAUDE_MEMORY_BRIDGE=false
 # SNAPSHOT_ENABLED=false
 
+# Storage and durability
+# AGENTMEMORY_STATE_BACKEND=file           # file (default) or redis; see "Storage backend" below
+# AGENTMEMORY_REDIS_URL=redis://localhost:6379   # Required with redis, plain redis:// only
+# AGENTMEMORY_STATE_SAVE_INTERVAL_MS=2000  # How often the engine writes file state to disk.
+                                           # A hard kill loses at most this window.
+# AGENTMEMORY_INDEX_SAVE_INTERVAL_MS=600000  # Minimum time between search index saves;
+                                             # shutdown and deletes still save at once.
+# AGENTMEMORY_GRAPH_COMPACT_ON_BOOT=true   # One-time background trim of oversized graph
+                                           # provenance; false skips it
+
+# Sessions
+# AGENTMEMORY_SESSION_SWEEP_ENABLED=true   # Hourly sweep marks sessions left active past
+                                           # the threshold as abandoned. Deletes nothing;
+                                           # new activity makes the session active again.
+# AGENTMEMORY_SESSION_SWEEP_STALE_HOURS=24
+
+# Capture filters (hooks)
+# AGENTMEMORY_CAPTURE_ALLOW=               # Comma or space list of tool names or globs;
+                                           # when set, only these tools are captured
+# AGENTMEMORY_CAPTURE_DENY=                # Extra names or globs to skip, added to the
+                                           # defaults: memory_*, toolsearch,
+                                           # listmcpresources, fetchmcpresource
+# AGENTMEMORY_CAPTURE_OUTPUT_MAX=8000      # Max characters of tool output per observation
+# AGENTMEMORY_PRE_COMPACT_BUDGET=1500      # Token budget for PreCompact context; 0 disables
+
+# Audit log
+# AGENTMEMORY_AUDIT_RETENTION_MONTHS=0     # Drop month scopes older than N months; 0 keeps all
+# AGENTMEMORY_AUDIT_INDEX_PERSIST=false    # 1 or true records index migration and cleanup
+                                           # rows (debugging only)
+
 # Team
 # TEAM_ID=
 # USER_ID=
@@ -1710,6 +1749,8 @@ curl -H "Authorization: Bearer $(cat ~/.agentmemory/secret)" http://localhost:31
 | Method | Path | Description |
 |--------|------|-------------|
 | `GET` | `/agentmemory/health` | Health check (always public) |
+| `GET` | `/agentmemory/status` | What is wrong and how to fix it (HTML for browsers, JSON otherwise) |
+| `GET` | `/agentmemory/viewer/snapshot` | Everything the viewer shows, in one response |
 | `POST` | `/agentmemory/session/start` | Start session + get context |
 | `POST` | `/agentmemory/session/end` | End session |
 | `POST` | `/agentmemory/observe` | Capture observation (see capture delivery below) |
@@ -1769,7 +1810,7 @@ curl -X POST http://localhost:3111/agentmemory/graph/compact -H "Content-Type: a
 ```bash
 npm run dev               # Hot reload
 npm run build             # Production build
-npm test                  # 1,674 tests
+npm test                  # 2,500+ tests
 npm run test:integration  # API tests (requires running services)
 ```
 
