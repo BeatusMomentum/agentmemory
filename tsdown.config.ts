@@ -76,6 +76,14 @@ export default defineConfig([
     sourcemap: false,
   },
   {
+    entry: ["integrations/omp/index.ts"],
+    outDir: "integrations/omp/dist",
+    ...shared,
+    dts: false,
+    clean: true,
+    sourcemap: false,
+  },
+  {
     entry: ["src/integrations/dsh.ts"],
     outDir: "dist/integrations",
     ...shared,
