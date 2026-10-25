@@ -850,7 +850,7 @@ Az agentmemory bejegyzés **ugyanaz az MCP szerver blokk** minden olyan hoszton,
 | **DeepSeek Harness** | `$DSH_HOME/cordis.patch.yml` | Az `agentmemory connect dsh` bekapcsolja az MCP-eszközöket. A `--with-hooks` betölti az AgentMemoryhoz mellékelt natív rögzítőbővítményt. Külön bővítménycsomag nem szükséges. [DSH](../docs/dsh.md). |
 | **Goose** | Goose MCP beállítások felhasználói felülete | Ugyanaz a `mcpServers` blokk; használd a `goose configure` → Add Extension → MCP menüt. A közvetlen YAML-szerkesztés a `~/.config/goose/config.yaml`-ban is támogatott, de a séma `extensions:` + `cmd`-t használ (nem `mcpServers:` + `command`-ot). |
 | **Aider** | n/a | Szkriptekből a [hitelesített REST-példákkal](#validate-a-fresh-install-and-restart-persistence) tárolhatsz és kereshetsz. |
-| **Bármely ágens (32+)** | n/a | Az `npx skillkit install agentmemory` automatikusan felismeri a hosztot, és beolvaszt. |
+| **Támogatott ágensek** | Csak skillek | `npx skills add rohitg00/agentmemory`; válassza ki a telepítendő skilleket és a célágenseket. |
 
 **Sandboxolt MCP kliensek** (Flatpak / Snap / korlátozó konténerek), amelyek nem érik el a hoszt `localhost`-ját: állítsd be a `"AGENTMEMORY_FORCE_PROXY": "1"`-et is az `env` blokkban, és az `AGENTMEMORY_URL`-t irányítsd egy olyan útvonalra, amit a sandbox valóban elér (pl. a LAN-IP-d).
 

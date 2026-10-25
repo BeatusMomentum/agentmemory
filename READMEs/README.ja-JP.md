@@ -845,7 +845,7 @@ agentmemory のエントリは、`mcpServers` の形式を使うすべてのホ�
 | **DeepSeek Harness** | `$DSH_HOME/cordis.patch.yml` | `agentmemory connect dsh` で MCP ツールを有効にします。`--with-hooks` を追加すると、AgentMemory 同梱のネイティブキャプチャプラグインを読み込みます。別のプラグインパッケージは不要です。 [DSH](../docs/dsh.md). |
 | **Goose** | Goose の MCP 設定 UI | 同じ `mcpServers` ブロック。`goose configure` → Add Extension → MCP を使用。`~/.config/goose/config.yaml` の直接編集もサポートされていますが、スキーマは `mcpServers:` + `command` ではなく `extensions:` + `cmd` を使います。 |
 | **Aider** | n/a | [REST API](#validate-a-fresh-install-and-restart-persistence) |
-| **任意のエージェント(32+)** | n/a | `npx skillkit install agentmemory` がホストを自動検出してマージします。 |
+| **対応エージェント** | skills のみ | `npx skills add rohitg00/agentmemory`; インストールする skills と対象のエージェントを選択します。 |
 
 ホストの `localhost` に到達できない**サンドボックス化された MCP クライアント**(Flatpak / Snap /制限の強いコンテナ)では、`env` ブロックに `"AGENTMEMORY_FORCE_PROXY": "1"` も設定し、`AGENTMEMORY_URL` をサンドボックスが実際に到達できるルート(例: あなたの LAN IP)に向けてください。
 

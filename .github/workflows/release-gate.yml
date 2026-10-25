@@ -66,6 +66,7 @@ jobs:
             --dependencies "$GITHUB_WORKSPACE/node_modules" \
             --out "${{ runner.temp }}/vector-recovery-gate"
       - run: npm run test:summary-recovery:packaged -- --skip-build --out "${{ runner.temp }}/summary-recovery-gate"
+      - run: npm run test:cli-diagnostics:packaged -- --skip-build --out "${{ runner.temp }}/cli-diagnostics-gate"
       - name: Verify bounded graph migration with the packaged CLI
         run: |
           mkdir -p "$RUNNER_TEMP/graph-index-pack"
@@ -81,6 +82,7 @@ jobs:
             ${{ runner.temp }}/startup-gate
             ${{ runner.temp }}/vector-recovery-gate
             ${{ runner.temp }}/summary-recovery-gate
+            ${{ runner.temp }}/cli-diagnostics-gate
             ${{ runner.temp }}/graph-index-gate
           if-no-files-found: ignore
           retention-days: 14

@@ -843,7 +843,7 @@ agentmemory 항목은 `mcpServers` 형태를 사용하는 모든 호스트(Curso
 | **DeepSeek Harness** | `$DSH_HOME/cordis.patch.yml` | `agentmemory connect dsh`는 MCP 도구를 활성화합니다. `--with-hooks`를 추가하면 AgentMemory에 포함된 네이티브 캡처 플러그인을 불러옵니다. 별도 플러그인 패키지는 필요하지 않습니다. [DSH](../docs/dsh.md). |
 | **Goose** | Goose MCP 설정 UI | 동일한 `mcpServers` 블록. `goose configure` → Add Extension → MCP를 사용하십시오. `~/.config/goose/config.yaml`에서 직접 YAML을 편집할 수도 있지만, 스키마는 `mcpServers:` + `command`가 아니라 `extensions:` + `cmd`를 사용합니다. |
 | **Aider** | 해당 없음 | [REST API](#validate-a-fresh-install-and-restart-persistence) |
-| **모든 에이전트 (32+)** | 해당 없음 | `npx skillkit install agentmemory`가 호스트를 자동으로 감지해 병합합니다. |
+| **지원되는 에이전트** | skills만 설치 | `npx skills add rohitg00/agentmemory`; 설치할 skills와 대상 에이전트를 선택합니다. |
 
 **샌드박스 MCP 클라이언트**(Flatpak / Snap / 제한적인 컨테이너)가 호스트의 `localhost`에 도달할 수 없는 경우: `env` 블록에 `"AGENTMEMORY_FORCE_PROXY": "1"`도 설정하고, `AGENTMEMORY_URL`을 샌드박스가 실제로 도달할 수 있는 경로(예: LAN IP)로 지정하십시오.
 

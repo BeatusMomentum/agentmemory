@@ -852,7 +852,7 @@ npx skills add rohitg00/agentmemory -y -a '*'   # install to every installed age
 | **DeepSeek Harness** | `$DSH_HOME/cordis.patch.yml` | `agentmemory connect dsh` вмикає інструменти MCP. Додайте `--with-hooks`, щоб завантажити вбудований в AgentMemory плагін запису подій. Окремий пакет плагіна не потрібен. [DSH](../docs/dsh.md). |
 | **Goose** | Інтерфейс налаштувань MCP Goose | Той самий блок `mcpServers`; скористайтеся `goose configure` → Add Extension → MCP. Пряме редагування YAML у `~/.config/goose/config.yaml` підтримується, але схема використовує `extensions:` + `cmd` (а не `mcpServers:` + `command`). |
 | **Aider** | н/д | Для збереження й пошуку зі скриптів використовуйте [REST-приклади з автентифікацією](#validate-a-fresh-install-and-restart-persistence). |
-| **Будь-який агент (32+)** | н/д | `npx skillkit install agentmemory` автоматично визначає хост і об'єднує конфігурацію. |
+| **Підтримувані агенти** | Лише скіли | `npx skills add rohitg00/agentmemory`; виберіть скіли для встановлення та цільових агентів. |
 
 **MCP-клієнти в sandbox** (Flatpak / Snap / обмежувальні контейнери), які не можуть дістатися `localhost` хоста: також встановіть `"AGENTMEMORY_FORCE_PROXY": "1"` у блоці `env` та вкажіть у `AGENTMEMORY_URL` маршрут, якого sandbox справді може досягти (наприклад, вашу IP-адресу в LAN).
 

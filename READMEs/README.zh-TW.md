@@ -843,7 +843,7 @@ Hermes、OpenClaw、Pi 和 Oh My Pi 的連接器預設安裝原生整合和 skil
 | **DeepSeek Harness** | `$DSH_HOME/cordis.patch.yml` | `agentmemory connect dsh` 啟用 MCP 工具。加入 `--with-hooks` 可載入 AgentMemory 內建的原生擷取外掛程式，無需額外的外掛套件。 [DSH](../docs/dsh.md). |
 | **Goose** | Goose MCP 設定介面 | 同樣的 `mcpServers` 區塊;使用 `goose configure` → Add Extension → MCP。也支援直接編輯 `~/.config/goose/config.yaml`,但其格式使用 `extensions:` + `cmd`(而非 `mcpServers:` + `command`)。 |
 | **Aider** | 不適用 | [REST API](#validate-a-fresh-install-and-restart-persistence) |
-| **任何代理(32+)** | 不適用 | `npx skillkit install agentmemory` 會自動偵測宿主並合併設定。 |
+| **支援的代理** | 僅安裝 skills | `npx skills add rohitg00/agentmemory`; 選擇要安裝的 skills 及目標代理。 |
 
 **沙箱化的 MCP 客戶端**(Flatpak / Snap / 限制較嚴格的容器)若無法連到宿主的 `localhost`:請在 `env` 區塊中也設定 `"AGENTMEMORY_FORCE_PROXY": "1"`,並讓 `AGENTMEMORY_URL` 指向沙箱實際能連到的路徑(例如你的 LAN IP)。
 

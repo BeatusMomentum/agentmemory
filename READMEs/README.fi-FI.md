@@ -852,7 +852,7 @@ agentmemory-merkintä on **sama MCP-palvelinlohko** jokaisessa isännässä, jok
 | **DeepSeek Harness** | `$DSH_HOME/cordis.patch.yml` | `agentmemory connect dsh` ottaa MCP-työkalut käyttöön. Lisää `--with-hooks` ladataksesi AgentMemoryn mukana tulevan natiivin tallennuslisäosan. Erillistä lisäosapakettia ei tarvita. [DSH](../docs/dsh.md). |
 | **Goose** | Goosen MCP-asetuskäyttöliittymä | Sama `mcpServers`-lohko; käytä `goose configure` → Add Extension → MCP. Suora YAML-muokkaus polussa `~/.config/goose/config.yaml` on tuettu, mutta skeema käyttää `extensions:` + `cmd` (ei `mcpServers:` + `command`). |
 | **Aider** | ei saatavilla | Käytä [autentikoituja REST-esimerkkejä](#validate-a-fresh-install-and-restart-persistence) tallentamiseen ja hakemiseen skripteistä. |
-| **Mikä tahansa agentti (32+)** | ei saatavilla | `npx skillkit install agentmemory` tunnistaa isännän automaattisesti ja yhdistää. |
+| **Tuetut agentit** | Vain taidot | `npx skills add rohitg00/agentmemory`; valitse asennettavat taidot ja kohdeagentit. |
 
 **Hiekkalaatikoidut MCP-asiakkaat** (Flatpak / Snap / rajoittavat kontit), jotka eivät tavoita isännän `localhost`-osoitetta: aseta lisäksi `"AGENTMEMORY_FORCE_PROXY": "1"` `env`-lohkoon, ja osoita `AGENTMEMORY_URL` reitille, jonka hiekkalaatikko oikeasti tavoittaa (esim. LAN-IP-osoitteesi).
 

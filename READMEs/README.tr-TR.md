@@ -852,7 +852,7 @@ agentmemory girdisi, `mcpServers` şeklini kullanan her host'ta (Cursor, Claude 
 | **DeepSeek Harness** | `$DSH_HOME/cordis.patch.yml` | `agentmemory connect dsh` MCP araçlarını etkinleştirir. AgentMemory ile gelen yerel kayıt eklentisini yüklemek için `--with-hooks` ekleyin. Ayrı bir eklenti paketi gerekmez. [DSH](../docs/dsh.md). |
 | **Goose** | Goose MCP ayarları arayüzü | Aynı `mcpServers` bloğu; `goose configure` → Add Extension → MCP kullanın. `~/.config/goose/config.yaml`'da doğrudan YAML düzenleme desteklenir, ancak şema `extensions:` + `cmd` kullanır (`mcpServers:` + `command` değil). |
 | **Aider** | yok | Betiklerden kaydetmek ve aramak için [kimlik doğrulamalı REST örneklerini](#validate-a-fresh-install-and-restart-persistence) kullanın. |
-| **Herhangi bir ajan (32+)** | yok | `npx skillkit install agentmemory`, host'u otomatik algılar ve birleştirir. |
+| **Desteklenen ajanlar** | Yalnızca beceriler | `npx skills add rohitg00/agentmemory`; yüklenecek becerileri ve hedef ajanları seçin. |
 
 Host'un `localhost`'una erişemeyen **sandboxlanmış MCP istemcileri** (Flatpak / Snap / kısıtlayıcı container'lar) için: `env` bloğunda ayrıca `"AGENTMEMORY_FORCE_PROXY": "1"` ayarlayın ve `AGENTMEMORY_URL`'i sandbox'ın gerçekten erişebileceği bir rotaya (örn. LAN IP'niz) işaret edin.
 

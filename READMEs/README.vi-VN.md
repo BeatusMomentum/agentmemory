@@ -845,7 +845,7 @@ Entry của agentmemory là **cùng một block MCP server** trên mọi host d�
 | **DeepSeek Harness** | `$DSH_HOME/cordis.patch.yml` | `agentmemory connect dsh` bật các công cụ MCP. Thêm `--with-hooks` để tải plugin ghi nhận sự kiện gốc đi kèm AgentMemory. Không cần gói plugin riêng. [DSH](../docs/dsh.md). |
 | **Goose** | Goose MCP settings UI | Cùng block `mcpServers`; dùng `goose configure` → Add Extension → MCP. Sửa YAML trực tiếp tại `~/.config/goose/config.yaml` cũng được hỗ trợ nhưng schema dùng `extensions:` + `cmd` (không phải `mcpServers:` + `command`). |
 | **Aider** | n/a | [REST API](#validate-a-fresh-install-and-restart-persistence) |
-| **Bất kỳ agent nào (32+)** | n/a | `npx skillkit install agentmemory` tự phát hiện host và gộp. |
+| **Các agent được hỗ trợ** | Chỉ cài skills | `npx skills add rohitg00/agentmemory`; chọn skills cần cài và các agent đích. |
 
 **Các MCP client chạy trong sandbox** (Flatpak / Snap / container hạn chế) không thể chạm tới `localhost` của host: hãy đặt thêm `"AGENTMEMORY_FORCE_PROXY": "1"` trong block `env`, và chỉ `AGENTMEMORY_URL` tới một route mà sandbox thực sự chạm tới được (ví dụ IP LAN của bạn).
 

@@ -845,7 +845,7 @@ Hermes, OpenClaw, Pi ও Oh My Pi কানেক্টর ডিফল্টভ
 | **DeepSeek Harness** | `$DSH_HOME/cordis.patch.yml` | `agentmemory connect dsh` MCP টুল চালু করে। AgentMemory-এর সঙ্গে থাকা নেটিভ ক্যাপচার প্লাগইন চালু করতে `--with-hooks` যোগ করুন। আলাদা প্লাগইন প্যাকেজ প্রয়োজন নেই। [DSH](../docs/dsh.md). |
 | **Goose** | Goose MCP সেটিংস UI | একই `mcpServers` ব্লক; `goose configure` → Add Extension → MCP ব্যবহার করুন। `~/.config/goose/config.yaml`-এ সরাসরি YAML এডিট সাপোর্টেড, কিন্তু স্কিমা `extensions:` + `cmd` ব্যবহার করে (`mcpServers:` + `command` নয়)। |
 | **Aider** | n/a | [REST API](#validate-a-fresh-install-and-restart-persistence) |
-| **যেকোনো এজেন্ট (32+)** | n/a | `npx skillkit install agentmemory` হোস্ট অটো-ডিটেক্ট করে মার্জ করে। |
+| **সমর্থিত এজেন্ট** | শুধু স্কিল | `npx skills add rohitg00/agentmemory`; ইনস্টল করার স্কিল এবং লক্ষ্য এজেন্ট বেছে নিন। |
 
 **স্যান্ডবক্সড MCP ক্লায়েন্ট** (Flatpak / Snap / রেস্ট্রিক্টিভ কন্টেইনার) যা হোস্টের `localhost`-এ পৌঁছাতে পারে না: `env` ব্লকে `"AGENTMEMORY_FORCE_PROXY": "1"`-ও সেট করুন, এবং `AGENTMEMORY_URL` এমন একটি রুটে পয়েন্ট করুন যেখানে স্যান্ডবক্স সত্যিই পৌঁছাতে পারে (যেমন আপনার LAN IP)।
 

@@ -845,7 +845,7 @@ agentmemory entry, `mcpServers` shape का उपयोग करने वा
 | **DeepSeek Harness** | `$DSH_HOME/cordis.patch.yml` | `agentmemory connect dsh` MCP टूल चालू करता है। AgentMemory में शामिल नेटिव कैप्चर प्लगइन लोड करने के लिए `--with-hooks` जोड़ें। अलग प्लगइन पैकेज की ज़रूरत नहीं है। [DSH](../docs/dsh.md). |
 | **Goose** | Goose MCP settings UI | वही `mcpServers` block; `goose configure` → Add Extension → MCP का उपयोग करें। `~/.config/goose/config.yaml` पर direct YAML edit supported है लेकिन schema `extensions:` + `cmd` का उपयोग करता है (`mcpServers:` + `command` नहीं)। |
 | **Aider** | n/a | [REST API](#validate-a-fresh-install-and-restart-persistence) |
-| **कोई भी एजेंट (32+)** | n/a | `npx skillkit install agentmemory` host को auto-detect करता है और merge करता है। |
+| **समर्थित एजेंट** | केवल skills | `npx skills add rohitg00/agentmemory`; इंस्टॉल करने वाले skills और लक्षित एजेंट चुनें। |
 
 **Sandboxed MCP क्लाइंट्स** (Flatpak / Snap / प्रतिबंधात्मक containers) जो host के `localhost` तक नहीं पहुँच सकते: `env` block में `"AGENTMEMORY_FORCE_PROXY": "1"` भी set करें, और `AGENTMEMORY_URL` को एक ऐसे route पर point करें जिस तक sandbox वास्तव में पहुँच सकता है (जैसे आपका LAN IP)।
 

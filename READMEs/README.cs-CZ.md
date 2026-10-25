@@ -852,7 +852,7 @@ Položka agentmemory je **stejný blok serveru MCP** na všech hostitelích, kte
 | **DeepSeek Harness** | `$DSH_HOME/cordis.patch.yml` | `agentmemory connect dsh` zapne nástroje MCP. Přidejte `--with-hooks` pro nativní zachytávání zahrnuté v AgentMemory. Samostatný balíček pluginu není potřeba. [DSH](../docs/dsh.md). |
 | **Goose** | UI nastavení MCP v Goose | Stejný blok `mcpServers`; použijte `goose configure` → Add Extension → MCP. Přímá úprava YAML v `~/.config/goose/config.yaml` je podporována, ale schéma používá `extensions:` + `cmd` (ne `mcpServers:` + `command`). |
 | **Aider** | n/a | Použijte [autentizované REST příklady](#validate-a-fresh-install-and-restart-persistence) pro ukládání a vyhledávání ze skriptů. |
-| **Jakýkoli agent (32+)** | n/a | `npx skillkit install agentmemory` automaticky detekuje hostitele a sloučí konfiguraci. |
+| **Podporovaní agenti** | Pouze skills | `npx skills add rohitg00/agentmemory`; vyberte skills a agenty, pro které je chcete nainstalovat. |
 
 **Sandboxovaní klienti MCP** (Flatpak / Snap / omezující kontejnery), kteří se nedostanou na `localhost` hostitele: navíc nastavte `"AGENTMEMORY_FORCE_PROXY": "1"` v bloku `env` a nasměrujte `AGENTMEMORY_URL` na cestu, na kterou se sandbox skutečně dostane (např. vaši LAN IP adresu).
 

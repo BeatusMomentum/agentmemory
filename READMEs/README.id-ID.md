@@ -845,7 +845,7 @@ Entri agentmemory adalah **blok server MCP yang sama** di setiap host yang memak
 | **DeepSeek Harness** | `$DSH_HOME/cordis.patch.yml` | `agentmemory connect dsh` mengaktifkan alat MCP. Tambahkan `--with-hooks` untuk memuat plugin perekaman native yang disertakan dalam AgentMemory. Tidak perlu paket plugin terpisah. [DSH](../docs/dsh.md). |
 | **Goose** | Settings UI MCP Goose | Blok `mcpServers` yang sama; gunakan `goose configure` → Add Extension → MCP. Edit YAML langsung di `~/.config/goose/config.yaml` juga didukung tapi skemanya memakai `extensions:` + `cmd` (bukan `mcpServers:` + `command`). |
 | **Aider** | n/a | [REST API](#validate-a-fresh-install-and-restart-persistence) |
-| **Agen apa pun (32+)** | n/a | `npx skillkit install agentmemory` auto-detect host dan menggabungkannya. |
+| **Agen yang didukung** | Hanya skill | `npx skills add rohitg00/agentmemory`; pilih skill dan agen tujuan pemasangannya. |
 
 **Klien MCP yang di-sandbox** (Flatpak / Snap / kontainer restriktif) yang tidak bisa menjangkau `localhost` milik host: set juga `"AGENTMEMORY_FORCE_PROXY": "1"` di blok `env`, dan arahkan `AGENTMEMORY_URL` ke rute yang benar-benar bisa dijangkau sandbox (misalnya IP LAN Anda).
 

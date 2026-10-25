@@ -844,7 +844,7 @@ La entrada de agentmemory es el **mismo bloque de servidor MCP** en todos los ho
 | **DeepSeek Harness** | `$DSH_HOME/cordis.patch.yml` | `agentmemory connect dsh` activa las herramientas MCP. Añade `--with-hooks` para cargar el complemento nativo de captura incluido en AgentMemory. No requiere un paquete adicional. [DSH](../docs/dsh.md). |
 | **Goose** | UI de ajustes MCP de Goose | El mismo bloque `mcpServers`; usa `goose configure` → Add Extension → MCP. La edición directa del YAML en `~/.config/goose/config.yaml` está soportada, pero el schema usa `extensions:` + `cmd` (no `mcpServers:` + `command`). |
 | **Aider** | n/a | Usa los [ejemplos REST autenticados](#validate-a-fresh-install-and-restart-persistence) para guardar y buscar recuerdos desde scripts. |
-| **Cualquier agente (32+)** | n/a | `npx skillkit install agentmemory` autodetecta el host y fusiona. |
+| **Agentes compatibles** | Solo skills | `npx skills add rohitg00/agentmemory`; elige las skills y los agentes donde instalarlas. |
 
 **Clientes MCP en sandbox** (Flatpak / Snap / contenedores restrictivos) que no pueden alcanzar el `localhost` del host: añade también `"AGENTMEMORY_FORCE_PROXY": "1"` en el bloque `env`, y apunta `AGENTMEMORY_URL` a una ruta a la que el sandbox sí pueda llegar (p. ej. tu IP de LAN).
 

@@ -69,7 +69,6 @@ import {
   getConsolidationDecayDays,
   isAutoCompressEnabled,
   isContextInjectionEnabled,
-  detectEmbeddingProvider,
   describeLlmRoute,
   detectLlmProviderKind,
   getAgentId,
@@ -329,7 +328,7 @@ function sessionFacets(
 function describeEmbeddingProvider(): string {
   const active = getEmbeddingProvider();
   if (active) return `${active.name} (${active.dimensions} dims)`;
-  return detectEmbeddingProvider() ?? "none";
+  return "none";
 }
 
 const STATUS_CHECK_TIMEOUT_MS = 5000;
