@@ -117,11 +117,15 @@ Expect: the agent now lists agentmemory's tools. With the server running you sho
 
 For Oh My Pi, `connect omp` installs native capture, recall and the bundled skills. Use `connect omp --with-mcp` for the full toolset, then restart OMP and run `/agentmemory-status`. See [OMP setup and verification](integrations/omp/README.md).
 
+For Pi, `connect pi` installs native capture, recall and the 17 bundled skills. Use `connect pi --with-mcp` for the full toolset, then restart Pi or `/reload` and run `/agentmemory-status`. Skills appear as `/skill:<name>`. Keep one extension installation; see [Pi setup and migration](integrations/pi/README.md).
+
 ## 6. Install native skills
 
 ```bash
 npx skills add rohitg00/agentmemory -y
 ```
+
+Pi, Oh My Pi, Hermes and OpenClaw already receive skills through their native connector; skip this extra installation for those hosts.
 
 This installs the native skills so the agent knows when to call the memory tools, not just that they exist. `connect` makes the tools available; skills teach the agent when to use them.
 

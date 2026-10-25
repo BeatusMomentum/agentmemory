@@ -25,7 +25,7 @@ Generated from `src/cli/connect/index.ts`. Do not edit the block below by hand; 
 | OpenClaw | `openclaw` | Installs native recall/capture and bundled skills into the active OpenClaw state directory. MCP tools are opt-in with --with-mcp. |
 | OpenCode | `opencode` | Using MCP via ~/.config/opencode/opencode.json (top-level `mcp` key). For full auto-capture, also install the bundled plugin in plugin/opencode/. |
 | OpenHuman | `openhuman` | Using native hooks (REST API at :3111). MCP not required. |
-| pi | `pi` | Using native lifecycle hooks against the REST API at :3111 (recall on agent start, capture on agent end, memory tools). MCP not required. |
+| Pi | `pi` | Installs native recall, capture and skills. Add --with-mcp for the full memory toolset. |
 | Qwen Code | `qwen` | Using MCP via ~/.qwen/settings.json. Qwen Code's hook system can also be wired separately, see docs. |
 | Warp | `warp` | Using MCP via ~/.warp/.mcp.json. Skills auto-discover from .claude/skills/ if the Claude Code plugin is also installed. |
 | Zed | `zed` | Using MCP via ~/.config/zed/settings.json (key: context_servers). |

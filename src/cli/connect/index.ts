@@ -239,7 +239,7 @@ function summarize(
   }
 
   const wiredAny = results.some(
-    (r) => !["hermes", "hermes-agent", "openclaw", "claw", "omp"].includes(r.name) && (r.result.kind === "installed" || r.result.kind === "already-wired"),
+    (r) => !["hermes", "hermes-agent", "openclaw", "claw", "omp", "pi"].includes(r.name) && (r.result.kind === "installed" || r.result.kind === "already-wired"),
   );
   if (wiredAny) {
     p.log.info(

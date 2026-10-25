@@ -76,6 +76,16 @@ export default defineConfig([
     sourcemap: false,
   },
   {
+    name: "pi-extension",
+    entry: ["integrations/pi/index.ts"],
+    outDir: "integrations/pi/dist",
+    ...shared,
+    deps: { neverBundle: ["typebox"] },
+    dts: false,
+    clean: true,
+    sourcemap: false,
+  },
+  {
     entry: ["integrations/omp/index.ts"],
     outDir: "integrations/omp/dist",
     ...shared,
