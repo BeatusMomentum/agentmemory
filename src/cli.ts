@@ -124,7 +124,7 @@ const IS_RESET = args.includes("--reset");
 // (getRestPort/getBaseUrl/getEnginePort) or the --port /
 // --instance / --tools handlers below. Only-if-unset, so a real
 // process.env value — including one just set by a CLI flag — still wins.
-hydrateProcessEnvFromFile();
+const shellEnv = hydrateProcessEnvFromFile();
 
 // --version / -V early exit. Print VERSION + exit before any side effects
 // (engine boot, env load, dir mkdir). `-v` is taken by --verbose so we
@@ -1992,11 +1992,15 @@ function checkClaudeCodeHooks(): CCHooksCheck {
 // which prompts Fix/Skip/More/Quit per failing check, applies the fix
 // inline, and re-checks only the affected diagnostic.
 
+function doctorEnvPath(): string {
+  return process.env["AGENTMEMORY_ENV_FILE"] || join(homedir(), ".agentmemory", ".env");
+}
+
 function buildDoctorContext(): DoctorContext {
   return {
     baseUrl: getBaseUrl(),
     viewerUrl: getViewerUrl(),
-    envPath: join(homedir(), ".agentmemory", ".env"),
+    envPath: doctorEnvPath(),
     pidfilePath: readEngineState()?.kind === "compose" ? engineStatePath() : enginePidfilePath(),
     enginePath: engineStatePath(),
     pinnedVersion: IIPINNED_VERSION,
@@ -2005,16 +2009,17 @@ function buildDoctorContext(): DoctorContext {
 
 function buildDoctorEffects(): DoctorEffects {
   return {
-    envFileExists: () => existsSync(join(homedir(), ".agentmemory", ".env")),
+    envFileExists: () => existsSync(doctorEnvPath()),
     readEnvFile: () => {
       try {
         return parseEnvFile(
-          readFileSync(join(homedir(), ".agentmemory", ".env"), "utf-8"),
+          readFileSync(doctorEnvPath(), "utf-8"),
         );
       } catch {
         return {};
       }
     },
+    processEnv: () => shellEnv,
     pidfileExists: () => {
       const state = readEngineState();
       return state?.kind === "compose" ? Boolean(state.composePid) : existsSync(enginePidfilePath());
